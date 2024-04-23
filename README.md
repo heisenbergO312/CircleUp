@@ -5,5 +5,5 @@ Some of the key features:
 > Toggle darkmode/lightmode,
 > Implemented likes,
 > Mongodb integration for storing information of users,
-> Fully responsive,
+> Fully responsive
 
