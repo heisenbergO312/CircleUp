@@ -15,7 +15,7 @@ export const createPost = async (req, res) => {
       userPicturePath: user.picturePath,
       picturePath,
       likes: {},
-      comments: [],
+      comments: [], // Initialize comments array
     });
     await newPost.save();
 
@@ -23,6 +23,51 @@ export const createPost = async (req, res) => {
     res.status(201).json(post);
   } catch (err) {
     res.status(409).json({ message: err.message });
+  }
+};
+
+/*Comments */
+export const addCommentToPost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, comment } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const newComment = {
+      userId,
+      comment,
+      commenterName: `${user.firstName} ${user.lastName}`
+    };
+
+    post.comments.push(newComment);
+    await post.save();
+    res.status(200).json(post);
+  } catch (err) {
+    res.status(404).json({ message: err.message });
+  }
+};
+
+
+/* GET COMMENTS FOR POST */
+export const getCommentsForPost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    res.status(200).json(post.comments);
+  } catch (err) {
+    res.status(404).json({ message: err.message });
   }
 };
 

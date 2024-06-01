@@ -1,14 +1,9 @@
-import {
-  ChatBubbleOutlineOutlined,
-  FavoriteBorderOutlined,
-  FavoriteOutlined,
-  ShareOutlined,
-} from "@mui/icons-material";
-import { Box, Divider, IconButton, Typography, useTheme } from "@mui/material";
+import { useState } from "react";
+import { Box, Divider, IconButton, Typography, useTheme, InputBase, Button } from "@mui/material";
+import { ChatBubbleOutlineOutlined, FavoriteBorderOutlined, FavoriteOutlined, ShareOutlined } from "@mui/icons-material";
 import FlexBetween from "components/FlexBetween";
 import Friend from "components/Friend";
 import WidgetWrapper from "components/WidgetWrapper";
-import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setPost } from "state";
 
@@ -23,7 +18,8 @@ const PostWidget = ({
   likes,
   comments,
 }) => {
-  const [isComments, setIsComments] = useState(false);
+  const [isCommentsVisible, setIsCommentsVisible] = useState(false);
+  const [commentText, setCommentText] = useState("");
   const dispatch = useDispatch();
   const token = useSelector((state) => state.token);
   const loggedInUserId = useSelector((state) => state.user._id);
@@ -45,6 +41,24 @@ const PostWidget = ({
     });
     const updatedPost = await response.json();
     dispatch(setPost({ post: updatedPost }));
+  };
+
+  const handleComment = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/posts/${postId}/comment`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId: loggedInUserId, comment: commentText }),
+      });
+      const updatedPost = await response.json();
+      dispatch(setPost({ post: updatedPost }));
+      setCommentText(""); 
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    }
   };
 
   return (
@@ -81,7 +95,7 @@ const PostWidget = ({
           </FlexBetween>
 
           <FlexBetween gap="0.3rem">
-            <IconButton onClick={() => setIsComments(!isComments)}>
+            <IconButton onClick={() => setIsCommentsVisible(!isCommentsVisible)}>
               <ChatBubbleOutlineOutlined />
             </IconButton>
             <Typography>{comments.length}</Typography>
@@ -92,17 +106,27 @@ const PostWidget = ({
           <ShareOutlined />
         </IconButton>
       </FlexBetween>
-      {isComments && (
-        <Box mt="0.5rem">
-          {comments.map((comment, i) => (
-            <Box key={`${name}-${i}`}>
-              <Divider />
-              <Typography sx={{ color: main, m: "0.5rem 0", pl: "1rem" }}>
-                {comment}
-              </Typography>
-            </Box>
-          ))}
-          <Divider />
+      {isCommentsVisible && (
+        <Box mt="1rem">
+          <InputBase
+            placeholder="Add a comment..."
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            sx={{ width: "100%", backgroundColor: palette.background.paper, borderRadius: "4px", padding: "8px", marginBottom: "8px" }}
+          />
+          <Button onClick={handleComment} variant="contained" color="primary">
+            Comment
+          </Button>
+          <Box mt="0.5rem">
+            {comments.map((commentObj, i) => (
+              <Box key={`${commentObj.userId}-${i}`}>
+                <Divider />
+                <Typography sx={{ color: main, m: "0.5rem 0", pl: "1rem" }}>
+                  <strong>{commentObj.commenterName}:</strong> {commentObj.comment}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
     </WidgetWrapper>
