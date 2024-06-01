@@ -1,7 +1,9 @@
-# FullStack Social Media App
+A full-stack social media application aimed at increasing connections and sharing among its users.
 
-Build a COMPLETE Fullstack Responsive MERN App with Auth, Likes, Dark Mode | React, MongoDB, MUI
+Some of the key features:
+> User authentication,
+> Toggle darkmode/lightmode,
+> Implemented likes,
+> Mongodb integration for storing information of users,
+> Fully responsive
 
-Video: https://www.youtube.com/watch?v=K8YELRmUb5o
-
-For all related questions and discussions about this project, check out the discord: https://discord.gg/2FfPeEk2mX
