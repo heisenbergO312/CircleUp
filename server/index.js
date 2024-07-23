@@ -9,6 +9,8 @@ import morgan from "morgan";
 import { Storage } from '@google-cloud/storage';
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
+import os from "os";  // Import the os module
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import postRoutes from "./routes/posts.js";
@@ -33,8 +35,15 @@ app.use(bodyParser.urlencoded({ limit: "30mb", extended: true }));
 app.use(cors());
 app.use("/assets", express.static(path.join(__dirname, "public/assets")));
 
+/* GOOGLE CLOUD STORAGE CONFIGURATION */
+const encodedKey = process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64;
+if (encodedKey) {
+  const keyJson = Buffer.from(encodedKey, 'base64').toString('utf8');
+  const keyPath = path.join(os.tmpdir(), 'service-account-file.json');  // Use os.tmpdir()
+  fs.writeFileSync(keyPath, keyJson);
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
+}
 
-/*GOOGLE CLOUD STORAGE*/
 const gcsStorage = new Storage({
   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 });

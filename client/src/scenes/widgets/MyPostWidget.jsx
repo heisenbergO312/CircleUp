@@ -39,7 +39,7 @@ const MyPostWidget = ({ picturePath }) => {
   const medium = palette.neutral.medium;
 
   const fetchUserPictureUrl = async () => {
-    const response = await fetch(`http://localhost:3001/users/${_id}`, {
+    const response = await fetch(`https://circleup-67p5.onrender.com/users/${_id}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -60,7 +60,7 @@ const MyPostWidget = ({ picturePath }) => {
       formData.append("picturePath", image.name);
     }
 
-    const response = await fetch(`http://localhost:3001/posts`, {
+    const response = await fetch(`https://circleup-67p5.onrender.com/posts`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
