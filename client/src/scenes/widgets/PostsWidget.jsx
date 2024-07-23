@@ -45,7 +45,7 @@ const PostsWidget = ({ userId, isProfile = false }) => {
     } else {
       getPosts();
     }
-  }, [isProfile, userId, token]); // Added dependencies
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (
