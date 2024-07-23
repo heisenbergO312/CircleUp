@@ -1,11 +1,42 @@
 import Post from "../models/Post.js";
 import User from "../models/User.js";
+import { bucket } from "../index.js";
+
+/*Get Signed Url */
+const getSignedUrl = async (fileName) => {
+  const options = {
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+  };
+
+  try {
+    const [url] = await bucket.file(fileName).getSignedUrl(options);
+    // console.log(`Generated signed URL: ${url}`);
+    return url;
+  } catch (err) {
+    console.error(`Error generating signed URL for ${fileName}:`, err);
+    throw err;
+  }
+};
 
 /* CREATE */
 export const createPost = async (req, res) => {
   try {
-    const { userId, description, picturePath } = req.body;
+    const { userId, description } = req.body;
     const user = await User.findById(userId);
+
+    // Handle file upload to Google Cloud Storage
+    const picture = req.file;
+    const picturePath = `images/${Date.now()}_${picture.originalname}`;
+    
+    // Upload the picture to GCS
+    await bucket.upload(picture.path, {
+      destination: picturePath,
+      resumable: false,
+      gzip: true,
+    });
+
     const newPost = new Post({
       userId,
       firstName: user.firstName,
@@ -13,14 +44,31 @@ export const createPost = async (req, res) => {
       location: user.location,
       description,
       userPicturePath: user.picturePath,
-      picturePath,
+      picturePath, // Store relative path
       likes: {},
       comments: [], // Initialize comments array
     });
     await newPost.save();
 
-    const post = await Post.find();
-    res.status(201).json(post);
+    // Fetch all posts after creating a new one
+    const posts = await Post.find();
+
+    // Map over posts to add signed picture URLs
+    const postsWithUrls = await Promise.all(posts.map(async (post) => {
+      if (post.picturePath) {
+        const pictureUrl = await getSignedUrl(post.picturePath);
+        const pictureUser = post.userPicturePath ? await getSignedUrl(post.userPicturePath) : null;
+        return {
+          ...post._doc,
+          pictureUrl,
+          pictureUser,
+        };
+      } else {
+        return post;
+      }
+    }));
+
+    res.status(201).json(postsWithUrls);
   } catch (err) {
     res.status(409).json({ message: err.message });
   }
@@ -50,12 +98,23 @@ export const addCommentToPost = async (req, res) => {
 
     post.comments.push(newComment);
     await post.save();
-    res.status(200).json(post);
+
+    if (post.picturePath) {
+      const pictureUrl = await getSignedUrl(post.picturePath);
+      const pictureUser = post.userPicturePath ? await getSignedUrl(post.userPicturePath) : null;
+      const postWithUrls = {
+        ...post._doc,
+        pictureUrl,
+        pictureUser,
+      };
+      res.status(200).json(postWithUrls);
+    } else {
+      res.status(200).json(post);
+    }
   } catch (err) {
     res.status(404).json({ message: err.message });
   }
 };
-
 
 /* GET COMMENTS FOR POST */
 export const getCommentsForPost = async (req, res) => {
@@ -74,9 +133,25 @@ export const getCommentsForPost = async (req, res) => {
 /* READ */
 export const getFeedPosts = async (req, res) => {
   try {
-    const post = await Post.find();
-    res.status(200).json(post);
+    const posts = await Post.find();
+    // Map over posts to add signed picture URLs
+    const postsWithUrls = await Promise.all(posts.map(async (post) => {
+      if (post.picturePath) {
+        const pictureUrl = await getSignedUrl(post.picturePath);
+        const pictureUser = post.userPicturePath ? await getSignedUrl(post.userPicturePath) : null;
+        return {
+          ...post._doc,
+          pictureUrl,
+          pictureUser,
+        };
+      } else {
+        return post;
+      }
+    }));
+
+    res.status(200).json(postsWithUrls);
   } catch (err) {
+    console.error("Error fetching posts:", err);
     res.status(404).json({ message: err.message });
   }
 };
@@ -84,8 +159,22 @@ export const getFeedPosts = async (req, res) => {
 export const getUserPosts = async (req, res) => {
   try {
     const { userId } = req.params;
-    const post = await Post.find({ userId });
-    res.status(200).json(post);
+    const posts = await Post.find({ userId });
+
+    // Map over posts to add signed picture URLs
+    const postsWithUrls = await Promise.all(posts.map(async (post) => {
+      if (post.picturePath) {
+        const pictureUrl = await getSignedUrl(post.picturePath);
+        return {
+          ...post._doc,
+          pictureUrl,
+        };
+      } else {
+        return post;
+      }
+    }));
+
+    res.status(200).json(postsWithUrls);
   } catch (err) {
     res.status(404).json({ message: err.message });
   }
@@ -111,7 +200,18 @@ export const likePost = async (req, res) => {
       { new: true }
     );
 
-    res.status(200).json(updatedPost);
+    if (updatedPost.picturePath) {
+      const pictureUrl = await getSignedUrl(updatedPost.picturePath);
+      const pictureUser = updatedPost.userPicturePath ? await getSignedUrl(updatedPost.userPicturePath) : null;
+      const updatedPostWithUrl = {
+        ...updatedPost._doc,
+        pictureUrl,
+        pictureUser,
+      };
+      res.status(200).json(updatedPostWithUrl);
+    } else {
+      res.status(200).json(updatedPost);
+    }
   } catch (err) {
     res.status(404).json({ message: err.message });
   }

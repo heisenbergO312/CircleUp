@@ -27,20 +27,23 @@ const PostWidget = ({
   const likeCount = Object.keys(likes).length;
 
   const { palette } = useTheme();
-  const main = palette.neutral.main;
   const primary = palette.primary.main;
 
   const patchLike = async () => {
-    const response = await fetch(`http://localhost:3001/posts/${postId}/like`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userId: loggedInUserId }),
-    });
-    const updatedPost = await response.json();
-    dispatch(setPost({ post: updatedPost }));
+    try {
+      const response = await fetch(`http://localhost:3001/posts/${postId}/like`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId: loggedInUserId }),
+      });
+      const updatedPost = await response.json();
+      dispatch(setPost({ post: updatedPost }));
+    } catch (error) {
+      console.error("Error liking post:", error);
+    }
   };
 
   const handleComment = async () => {
@@ -54,13 +57,13 @@ const PostWidget = ({
         body: JSON.stringify({ userId: loggedInUserId, comment: commentText }),
       });
       const updatedPost = await response.json();
+      console.log("This is the comment updated post,",updatedPost);
       dispatch(setPost({ post: updatedPost }));
       setCommentText(""); 
     } catch (error) {
       console.error("Error adding comment:", error);
     }
   };
-
   return (
     <WidgetWrapper m="2rem 0">
       <Friend
@@ -69,7 +72,7 @@ const PostWidget = ({
         subtitle={location}
         userPicturePath={userPicturePath}
       />
-      <Typography color={main} sx={{ mt: "1rem" }}>
+      <Typography color="textPrimary" sx={{ mt: "1rem" }}>
         {description}
       </Typography>
       {picturePath && (
@@ -78,7 +81,7 @@ const PostWidget = ({
           height="auto"
           alt="post"
           style={{ borderRadius: "0.75rem", marginTop: "0.75rem" }}
-          src={`http://localhost:3001/assets/${picturePath}`}
+          src={picturePath}
         />
       )}
       <FlexBetween mt="0.25rem">
@@ -121,7 +124,7 @@ const PostWidget = ({
             {comments.map((commentObj, i) => (
               <Box key={`${commentObj.userId}-${i}`}>
                 <Divider />
-                <Typography sx={{ color: main, m: "0.5rem 0", pl: "1rem" }}>
+                <Typography sx={{ color: "textPrimary", m: "0.5rem 0", pl: "1rem" }}>
                   <strong>{commentObj.commenterName}:</strong> {commentObj.comment}
                 </Typography>
               </Box>

@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import multer from "multer";
 import helmet from "helmet";
 import morgan from "morgan";
+import { Storage } from '@google-cloud/storage';
 import path from "path";
 import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.js";
@@ -32,6 +33,13 @@ app.use(bodyParser.urlencoded({ limit: "30mb", extended: true }));
 app.use(cors());
 app.use("/assets", express.static(path.join(__dirname, "public/assets")));
 
+
+/*GOOGLE CLOUD STORAGE*/
+const gcsStorage = new Storage({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+});
+export const bucket = gcsStorage.bucket(process.env.GCLOUD_STORAGE_BUCKET);
+
 /* FILE STORAGE */
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -51,6 +59,7 @@ app.post("/posts", verifyToken, upload.single("picture"), createPost);
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/posts", postRoutes);
+console.log(process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
 /* MONGOOSE SETUP */
 const PORT = process.env.PORT || 6001;

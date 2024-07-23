@@ -1,11 +1,39 @@
 import User from "../models/User.js";
+import { bucket } from "../index.js";
+
+/*Get Signed Url */
+const getSignedUrl = async (fileName) => {
+  const options = {
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+  };
+
+  try {
+    const [url] = await bucket.file(fileName).getSignedUrl(options);
+    return url;
+  } catch (err) {
+    console.error(`Error generating signed URL for ${fileName}:`, err);
+    throw err;
+  }
+};
 
 /* READ */
 export const getUser = async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
-    res.status(200).json(user);
+
+    if (user.picturePath) {
+      const pictureUrl = await getSignedUrl(user.picturePath);
+      const userWithPictureUrl = {
+        ...user._doc,
+        pictureUrl,
+      };
+      res.status(200).json(userWithPictureUrl);
+    } else {
+      res.status(200).json(user);
+    }
   } catch (err) {
     res.status(404).json({ message: err.message });
   }
@@ -19,10 +47,11 @@ export const getUserFriends = async (req, res) => {
     const friends = await Promise.all(
       user.friends.map((id) => User.findById(id))
     );
-    const formattedFriends = friends.map(
-      ({ _id, firstName, lastName, occupation, location, picturePath }) => {
-        return { _id, firstName, lastName, occupation, location, picturePath };
-      }
+    const formattedFriends = await Promise.all(
+      friends.map(async ({ _id, firstName, lastName, occupation, location, picturePath }) => {
+        const pictureUser = picturePath ? await getSignedUrl(picturePath) : null;
+        return { _id, firstName, lastName, occupation, location, pictureUser };
+      })
     );
     res.status(200).json(formattedFriends);
   } catch (err) {
@@ -50,10 +79,11 @@ export const addRemoveFriend = async (req, res) => {
     const friends = await Promise.all(
       user.friends.map((id) => User.findById(id))
     );
-    const formattedFriends = friends.map(
-      ({ _id, firstName, lastName, occupation, location, picturePath }) => {
-        return { _id, firstName, lastName, occupation, location, picturePath };
-      }
+    const formattedFriends = await Promise.all(
+      friends.map(async ({ _id, firstName, lastName, occupation, location, picturePath }) => {
+        const pictureUser = picturePath ? await getSignedUrl(picturePath) : null;
+        return { _id, firstName, lastName, occupation, location, pictureUser };
+      })
     );
 
     res.status(200).json(formattedFriends);

@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { bucket } from "../index.js";
 
 /* REGISTER USER */
 export const register = async (req, res) => {
@@ -10,11 +11,20 @@ export const register = async (req, res) => {
       lastName,
       email,
       password,
-      picturePath,
       friends,
       location,
       occupation,
     } = req.body;
+
+    const picture = req.file;
+    const picturePath = `images/${Date.now()}_${picture.originalname}`;
+
+    // Upload the picture to GCS
+    await bucket.upload(picture.path, {
+      destination: picturePath,
+      resumable: false,
+      gzip: true,
+    });
 
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(password, salt);
