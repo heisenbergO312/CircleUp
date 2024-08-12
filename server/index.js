@@ -1,6 +1,8 @@
 import express from "express";
 import bodyParser from "body-parser";
 import mongoose from "mongoose";
+import WebSocket from "ws";
+import http from 'http'
 import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
@@ -16,10 +18,12 @@ import userRoutes from "./routes/users.js";
 import postRoutes from "./routes/posts.js";
 import { register } from "./controllers/auth.js";
 import { createPost } from "./controllers/posts.js";
-import { verifyToken } from "./middleware/auth.js";
+import { verifyToken,verifyWebSocketToken } from "./middleware/auth.js";
 import User from "./models/User.js";
 import Post from "./models/Post.js";
 import { users, posts } from "./data/index.js";
+import { handleConnection } from "./controllers/webSocketController.js";
+
 
 /* CONFIGURATIONS */
 const __filename = fileURLToPath(import.meta.url);
@@ -68,7 +72,24 @@ app.post("/posts", verifyToken, upload.single("picture"), createPost);
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/posts", postRoutes);
-console.log(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
+
+app.post("/start-websocket", (req, res) => {
+  if (!wss) {
+    const server = http.createServer(app);
+
+    const wss = new WebSocket.Server({ server, path: '/websockets' });
+
+    wss.on('connection', (ws, req) => {
+      verifyWebSocketToken(ws, req, () => {
+        handleConnection(ws, wss);
+      });
+    });
+
+    server.listen(PORT, () => console.log(`Server with WebSocket Port: ${PORT}`));
+  }
+  res.status(200).send("WebSocket server started");
+});
 
 /* MONGOOSE SETUP */
 const PORT = process.env.PORT || 6001;
@@ -78,10 +99,8 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(() => {
-    app.listen(PORT, () => console.log(`Server Port: ${PORT}`));
 
-    /* ADD DATA ONE TIME */
-    // User.insertMany(users);
-    // Post.insertMany(posts);
+    app.listen(PORT, () => console.log(`Server Port: ${PORT}`));
+    
   })
   .catch((error) => console.log(`${error} did not connect`));

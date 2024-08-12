@@ -19,3 +19,25 @@ export const verifyToken = async (req, res, next) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export const verifyWebSocketToken = (ws, req, next) => {
+  try {
+    const token = req.url.split('token=')[1];
+
+    if (!token) {
+      ws.close();
+      return;
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        ws.close();
+      } else {
+        ws.user = decoded;
+        next();
+      }
+    });
+  } catch (err) {
+    ws.close();
+  }
+};

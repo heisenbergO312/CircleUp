@@ -20,6 +20,7 @@ const PostsWidget = ({ userId, isProfile = false }) => {
       console.error("Error fetching posts:", error);
     }
   };
+  
 
   const getUserPosts = async () => {
     try {

@@ -85,6 +85,7 @@ const Form = () => {
       body: JSON.stringify(values),
     });
     const loggedIn = await loggedInResponse.json();
+    console.log("Logged in response ",loggedIn)
     onSubmitProps.resetForm();
     if (loggedIn) {
       dispatch(

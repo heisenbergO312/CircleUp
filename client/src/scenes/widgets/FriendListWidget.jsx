@@ -1,7 +1,7 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import Friend from "components/Friend";
 import WidgetWrapper from "components/WidgetWrapper";
-import { useEffect } from "react";
+import { useEffect,useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setFriends } from "state";
 
@@ -11,7 +11,7 @@ const FriendListWidget = ({ userId }) => {
   const token = useSelector((state) => state.token);
   const friends = useSelector((state) => state.user.friends);
 
-  const getFriends = async () => {
+  const getFriends = useCallback(async () => {
     const response = await fetch(
       `https://circleup-67p5.onrender.com/users/${userId}/friends`,
       {
@@ -21,11 +21,13 @@ const FriendListWidget = ({ userId }) => {
     );
     const data = await response.json();
     dispatch(setFriends({ friends: data }));
-  };
+  }, [dispatch, token, userId]);
 
   useEffect(() => {
-    getFriends();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (userId && token) {
+      getFriends();
+    }
+  }, [getFriends, userId, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <WidgetWrapper>
@@ -39,6 +41,7 @@ const FriendListWidget = ({ userId }) => {
       </Typography>
       <Box display="flex" flexDirection="column" gap="1.5rem">
         {friends.map((friend) => (
+          console.log("Friend data,",friend),
           <Friend
             key={friend._id}
             friendId={friend._id}

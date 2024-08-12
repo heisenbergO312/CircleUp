@@ -165,9 +165,11 @@ export const getUserPosts = async (req, res) => {
     const postsWithUrls = await Promise.all(posts.map(async (post) => {
       if (post.picturePath) {
         const pictureUrl = await getSignedUrl(post.picturePath);
+        const pictureUser = post.userPicturePath ? await getSignedUrl(post.userPicturePath) : null;
         return {
           ...post._doc,
           pictureUrl,
+          pictureUser,
         };
       } else {
         return post;
