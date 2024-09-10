@@ -8,3 +8,5 @@ Some of the key features:
 > Fully responsive
 
 Deployed @ https://calm-klepon-e88332.netlify.app/
+--
+The server may take some time to start..
