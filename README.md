@@ -7,6 +7,6 @@ Some of the key features:
 > Mongodb integration for storing information of users,
 > Fully responsive
 
-Deployed @ https://calm-klepon-e88332.netlify.app/
+Deployed @ https://circle-up-chi.vercel.app/
 --
 The server may take some time to start..
