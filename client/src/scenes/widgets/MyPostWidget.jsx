@@ -16,21 +16,35 @@ import {
   Button,
   IconButton,
   useMediaQuery,
+  Dialog,
 } from "@mui/material";
-import FlexBetween from "components/FlexBetween";
+import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
+import EmojiPicker from "emoji-picker-react";
+import FlexBetween from "../../components/FlexBetween";
 import Dropzone from "react-dropzone";
-import UserImage from "components/UserImage";
-import WidgetWrapper from "components/WidgetWrapper";
-import { useState, useEffect } from "react";
+import UserImage from "../../components/UserImage";
+import WidgetWrapper from "../../components/WidgetWrapper";
+import { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setPosts } from "state";
+import { setPosts } from "../../state/index";
+import { useNavigate } from "react-router-dom";
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
+import app from "../../firebase";
 
-const MyPostWidget = ({ picturePath }) => {
+const MyPostWidget = ({ profilePhoto }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [isImage, setIsImage] = useState(false);
   const [image, setImage] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
   const [post, setPost] = useState("");
-  const [userPictureUrl, setUserPictureUrl] = useState(null); // Add state for user picture URL
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef();
   const { palette } = useTheme();
   const { _id } = useSelector((state) => state.user);
   const token = useSelector((state) => state.token);
@@ -38,47 +52,84 @@ const MyPostWidget = ({ picturePath }) => {
   const mediumMain = palette.neutral.mediumMain;
   const medium = palette.neutral.medium;
 
-  const fetchUserPictureUrl = async () => {
-    const response = await fetch(`https://circleup-67p5.onrender.com/users/${_id}`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await response.json();
-    setUserPictureUrl(data.pictureUrl);
+  const handleOpen = () => setOpen(true);
+
+  const handleClose = () => {
+    setOpen(false);
+    inputRef.current.focus();
+  };
+
+  const uploadImage = async () => {
+    if (image !== null) {
+      const fileName = new Date().getTime() + image?.name;
+      const storage = getStorage(app);
+      const StorageRef = ref(storage, fileName);
+
+      const uploadTask = uploadBytesResumable(StorageRef, image);
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log("Upload is " + progress + "% done");
+          switch (snapshot.state) {
+            case "paused":
+              console.log("Upload is paused");
+              break;
+            case "running":
+              console.log("Upload is running");
+              break;
+            default:
+              break;
+          }
+        },
+        (error) => {
+          console.log(error);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+            setImageUrl(downloadURL);
+          });
+        }
+      );
+    }
   };
 
   useEffect(() => {
-    fetchUserPictureUrl();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    uploadImage(); // eslint-disable-next-line
+  }, [image]);
 
   const handlePost = async () => {
-    const formData = new FormData();
-    formData.append("userId", _id);
-    formData.append("description", post);
+    while (image === null) {}
+    let formData = {};
+    formData.userId = _id;
+    formData.description = post;
     if (image) {
-      formData.append("picture", image);
-      formData.append("picturePath", image.name);
+      formData.postImage = imageUrl;
     }
 
-    const response = await fetch(`https://circleup-67p5.onrender.com/posts`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
-    const posts = await response.json();
-    console.log("After submitting received :",posts);
-    dispatch(setPosts({ posts }));
     setImage(null);
     setPost("");
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/posts`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+    const posts = await response.json();
+    dispatch(setPosts({ posts }));
+    navigate("/home");
   };
 
   return (
     <WidgetWrapper>
       <FlexBetween gap="1.5rem">
-        <UserImage image={userPictureUrl} /> {/* Use the fetched user picture URL */}
+        <UserImage image={profilePhoto} />
         <InputBase
           placeholder="What's on your mind..."
-          onChange={(e) => setPost(e.target.value)}
+          onChange={(e) => setPost(e.target.value.trimLeft())}
           value={post}
           sx={{
             width: "100%",
@@ -86,7 +137,27 @@ const MyPostWidget = ({ picturePath }) => {
             borderRadius: "2rem",
             padding: "1rem 2rem",
           }}
-        />
+        ></InputBase>
+        <Button
+          variant="outlined"
+          onClick={handleOpen}
+          sx={{ height: "2.3rem", minWidth: "10%", padding: 0 }}
+        >
+          <EmojiEmotionsIcon />
+        </Button>
+        <Dialog
+          open={open}
+          onClose={handleClose}
+          sx={{ top: 0, left: 0, position: "fixed" }}
+        >
+          <EmojiPicker
+            onEmojiClick={(e) => {
+              setPost(`${post} ${e.emoji}`);
+              handleClose();
+            }}
+            height="350px"
+          />
+        </Dialog>
       </FlexBetween>
       {isImage && (
         <Box
@@ -96,7 +167,11 @@ const MyPostWidget = ({ picturePath }) => {
           p="1rem"
         >
           <Dropzone
-            acceptedFiles=".jpg,.jpeg,.png"
+            accept={{
+              "image/png": [".png"],
+              "image/jpg": [".jpg"],
+              "image/jpeg": [".jpeg"],
+            }}
             multiple={false}
             onDrop={(acceptedFiles) => setImage(acceptedFiles[0])}
           >
@@ -148,10 +223,10 @@ const MyPostWidget = ({ picturePath }) => {
 
         {isNonMobileScreens ? (
           <>
-            {/* <FlexBetween gap="0.25rem">
+            <FlexBetween gap="0.25rem">
               <GifBoxOutlined sx={{ color: mediumMain }} />
               <Typography color={mediumMain}>Clip</Typography>
-            </FlexBetween> */}
+            </FlexBetween>
 
             <FlexBetween gap="0.25rem">
               <AttachFileOutlined sx={{ color: mediumMain }} />
@@ -170,7 +245,7 @@ const MyPostWidget = ({ picturePath }) => {
         )}
 
         <Button
-          disabled={!post}
+          disabled={!post || !image}
           onClick={handlePost}
           sx={{
             color: palette.background.alt,

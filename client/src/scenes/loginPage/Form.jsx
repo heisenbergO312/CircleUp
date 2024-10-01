@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Box,
   Button,
@@ -6,32 +6,45 @@ import {
   useMediaQuery,
   Typography,
   useTheme,
+  Collapse,
+  Alert,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import { Formik } from "formik";
 import * as yup from "yup";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { setLogin } from "state";
+import { setLogin } from "../../state/index";
 import Dropzone from "react-dropzone";
-import FlexBetween from "components/FlexBetween";
+import FlexBetween from "../../components/FlexBetween";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
+import app from "../../firebase";
 
 const registerSchema = yup.object().shape({
-  firstName: yup.string().required("required"),
-  lastName: yup.string().required("required"),
-  email: yup.string().email("invalid email").required("required"),
-  password: yup.string().required("required"),
+  firstName: yup.string().required("required").min(2).max(12),
+  lastName: yup.string().required("required").min(2).max(12),
+  email: yup.string().email("invalid email").required("required").max(50),
+  password: yup.string().required("required").min(5),
   location: yup.string().required("required"),
   occupation: yup.string().required("required"),
   picture: yup.string().required("required"),
 });
 
 const loginSchema = yup.object().shape({
-  email: yup.string().email("invalid email").required("required"),
-  password: yup.string().required("required"),
+  email: yup.string().email("invalid email").required("required").max(50),
+  password: yup.string().required("required").min(5),
 });
 
-const initialValuesRegister = {
+const initialValues = {
   firstName: "",
   lastName: "",
   email: "",
@@ -39,15 +52,19 @@ const initialValuesRegister = {
   location: "",
   occupation: "",
   picture: "",
-};
-
-const initialValuesLogin = {
-  email: "",
-  password: "",
+  otp: "",
 };
 
 const Form = () => {
   const [pageType, setPageType] = useState("login");
+  const [error, setError] = useState("");
+  const [clicked, setClicked] = useState(false);
+  const [otpClick, setOtpClick] = useState(false);
+  const [otpVerify, setOtpVerify] = useState(false);
+  const [validOtp, setValidOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [image, setImage] = useState(null);
+  const otpRef = useRef(null);
   const { palette } = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -55,59 +72,156 @@ const Form = () => {
   const isLogin = pageType === "login";
   const isRegister = pageType === "register";
 
-  const register = async (values, onSubmitProps) => {
-    // this allows us to send form info with image
-    const formData = new FormData();
-    for (let value in values) {
-      formData.append(value, values[value]);
+  if (error) {
+    setTimeout(() => {
+      setError(false);
+      setOtpClick(false);
+      setOtpVerify(false);
+    }, 5000);
+  }
+
+  const uploadImage = async () => {
+    if (image !== null) {
+      const fileName = new Date().getTime() + image?.name;
+      const storage = getStorage(app);
+      const StorageRef = ref(storage, fileName);
+
+      const uploadTask = uploadBytesResumable(StorageRef, image);
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log("Upload is " + progress + "% done");
+          switch (snapshot.state) {
+            case "paused":
+              console.log("Upload is paused");
+              break;
+            case "running":
+              console.log("Upload is running");
+              break;
+            default:
+              break;
+          }
+        },
+        (error) => {
+          console.log(error);
+        },
+        () => {
+          // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+          getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+            setImage(downloadURL);
+          });
+        }
+      );
     }
-    formData.append("picturePath", values.picture.name);
+  };
+
+  const register = async (values, { resetForm }) => {
+    const verified = await verifyOtp();
+    if (!verified) {
+      setError("Invalid Otp!");
+      setOtpClick(false);
+      setOtpVerify(false);
+      values.otp = "";
+      setClicked(false);
+      return;
+    }
+
+    values.email = values.email.toLowerCase();
+    let formData = {
+      ...values,
+    };
+    formData.profilePhoto = image;
 
     const savedUserResponse = await fetch(
-      "https://circleup-67p5.onrender.com/auth/register",
+      `${process.env.REACT_APP_BACKEND_URL}/auth/register`,
       {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       }
     );
-    const savedUser = await savedUserResponse.json();
-    onSubmitProps.resetForm();
 
+    const savedUser = await savedUserResponse.json();
+    resetForm();
+    setClicked(false);
+    if (savedUser.error) {
+      setError("User with this email already exists!");
+      setOtpClick(false);
+      return;
+    }
     if (savedUser) {
       setPageType("login");
     }
   };
 
   const login = async (values, onSubmitProps) => {
-    const loggedInResponse = await fetch("https://circleup-67p5.onrender.com/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
-    const loggedIn = await loggedInResponse.json();
-    console.log("Logged in response ",loggedIn)
+    values.email = values.email.toLowerCase();
     onSubmitProps.resetForm();
+    const loggedInResponse = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/auth/login`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      }
+    );
+    const loggedIn = await loggedInResponse.json();
+    setClicked(false);
+    if (loggedIn.msg) {
+      setError("Invalid Credentials!");
+      return;
+    }
     if (loggedIn) {
-      dispatch(
-        setLogin({
-          user: loggedIn.user,
-          token: loggedIn.token,
-        })
-      );
+      dispatch(setLogin({ user: loggedIn.user, token: loggedIn.token }));
       navigate("/home");
     }
   };
 
   const handleFormSubmit = async (values, onSubmitProps) => {
+    setClicked(true);
     if (isLogin) await login(values, onSubmitProps);
     if (isRegister) await register(values, onSubmitProps);
+  };
+
+  const sendOtp = async (values, onSubmitProps) => {
+    if (image) await uploadImage();
+    setClicked(true);
+    setOtpClick(true);
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/auth/register/otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: otpRef.current.values.email,
+        name: `${otpRef.current.values.firstName} ${otpRef.current.values.lastName}`,
+      }),
+    });
+    const otp = await response.json();
+    if (otp.error) {
+      setClicked(false);
+      setOtpClick(false);
+      return;
+    }
+    if (otp) {
+      setValidOtp(otp);
+      setClicked(false);
+    }
+  };
+
+  const verifyOtp = async (values, onSubmitProps) => {
+    if (String(otpRef.current.values.otp) === String(validOtp)) return true;
+    return false;
   };
 
   return (
     <Formik
       onSubmit={handleFormSubmit}
-      initialValues={isLogin ? initialValuesLogin : initialValuesRegister}
+      initialValues={initialValues}
       validationSchema={isLogin ? loginSchema : registerSchema}
+      innerRef={otpRef}
     >
       {({
         values,
@@ -129,7 +243,7 @@ const Form = () => {
             }}
           >
             {isRegister && (
-              <>
+              <React.Fragment>
                 <TextField
                   label="First Name"
                   onBlur={handleBlur}
@@ -181,11 +295,16 @@ const Form = () => {
                   p="1rem"
                 >
                   <Dropzone
-                    acceptedFiles=".jpg,.jpeg,.png"
+                    accept={{
+                      "image/png": [".png"],
+                      "image/jpg": [".jpg"],
+                      "image/jpeg": [".jpeg"],
+                    }}
                     multiple={false}
-                    onDrop={(acceptedFiles) =>
-                      setFieldValue("picture", acceptedFiles[0])
-                    }
+                    onDrop={(acceptedFiles) => {
+                      setFieldValue("picture", acceptedFiles[0]);
+                      setImage(acceptedFiles[0]);
+                    }}
                   >
                     {({ getRootProps, getInputProps }) => (
                       <Box
@@ -207,7 +326,7 @@ const Form = () => {
                     )}
                   </Dropzone>
                 </Box>
-              </>
+              </React.Fragment>
             )}
 
             <TextField
@@ -222,7 +341,7 @@ const Form = () => {
             />
             <TextField
               label="Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               onBlur={handleBlur}
               onChange={handleChange}
               value={values.password}
@@ -230,23 +349,142 @@ const Form = () => {
               error={Boolean(touched.password) && Boolean(errors.password)}
               helperText={touched.password && errors.password}
               sx={{ gridColumn: "span 4" }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
+            {!error && !isLogin && otpClick && (
+              <TextField
+                label="Enter your Otp"
+                type="text"
+                onBlur={handleBlur}
+                onChange={handleChange}
+                value={values.otp}
+                name="otp"
+                error={
+                  Boolean(touched.otp) &&
+                  otpClick &&
+                  (!values.otp || values.otp.length !== 4)
+                }
+                helperText={
+                  values.otp && values.otp.length !== 4
+                    ? "Otp must be exactly 4 characters"
+                    : null
+                }
+                sx={{ gridColumn: "span 4" }}
+              />
+            )}
+            {!error && !isLogin && otpClick && !otpVerify && (
+              <Typography
+                fontWeight="400"
+                variant="h5"
+                sx={{
+                  width: "20rem",
+                  color: palette.primary.main,
+                  mt: "-1.3rem",
+                  ml: "0.4rem",
+                }}
+              >
+                Check your e-mail and enter the otp
+              </Typography>
+            )}
           </Box>
+
+          {/* ALERT */}
+          {error && (
+            <Box sx={{ width: "100%", pt: "2%" }}>
+              <Collapse in={error}>
+                <Alert
+                  severity="error"
+                  action={
+                    <IconButton
+                      aria-label="close"
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        setError(false);
+                      }}
+                    >
+                      <CloseIcon fontSize="inherit" />
+                    </IconButton>
+                  }
+                  sx={{ fontSize: "0.95rem" }}
+                >
+                  {error}
+                </Alert>
+              </Collapse>
+            </Box>
+          )}
+
+          {pageType === "login" && (
+            <Typography
+              onClick={() => navigate("/forgot/password")}
+              sx={{
+                textDecoration: "underline",
+                color: palette.primary.main,
+                mt: "1rem",
+                pl: "0.2rem",
+                "&:hover": {
+                  cursor: "pointer",
+                  color: palette.primary.light,
+                },
+              }}
+            >
+              Forgot Password?
+            </Typography>
+          )}
 
           {/* BUTTONS */}
           <Box>
             <Button
               fullWidth
-              type="submit"
+              type={isLogin || otpClick ? "submit" : "button"}
               sx={{
-                m: "2rem 0",
+                m: pageType === "login" ? "1rem 0" : "2rem 0",
                 p: "1rem",
-                backgroundColor: palette.primary.main,
-                color: palette.background.alt,
-                "&:hover": { color: palette.primary.main },
+                backgroundColor: !clicked ? palette.primary.main : "#808080",
+                color: !clicked ? palette.background.alt : "#101010",
+                "&:hover": {
+                  color: !clicked ? palette.primary.main : null,
+                  backgroundColor: !clicked ? null : "#808080",
+                },
+                "&:disabled": {
+                  color: !clicked ? palette.background.alt : "#101010",
+                },
               }}
+              disabled={
+                clicked ||
+                (!values.email && !values.password) ||
+                (pageType === "login"
+                  ? Object.keys(errors).length !== 0
+                  : !values.firstName ||
+                    !values.lastName ||
+                    !values.location ||
+                    !values.occupation ||
+                    !values.picture ||
+                    Object.keys(errors).length !== 0) ||
+                (!isLogin &&
+                  otpClick &&
+                  (!values.otp || values.otp.length !== 4))
+              }
+              onClick={!otpClick && pageType !== "login" ? sendOtp : null}
             >
-              {isLogin ? "LOGIN" : "REGISTER"}
+              {!clicked
+                ? isLogin
+                  ? "LOGIN"
+                  : !isLogin && !otpClick
+                  ? "VERIFY EMAIL / SEND OTP"
+                  : "VERIFY OTP AND REGISTER"
+                : "WAIT..."}
             </Button>
             <Typography
               onClick={() => {

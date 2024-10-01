@@ -1,18 +1,23 @@
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
-import HomePage from "scenes/homePage";
-import LoginPage from "scenes/loginPage";
-import ProfilePage from "scenes/profilePage";
-import ChatPage from "scenes/chatPage"; // Import the new ChatPage component
+import HomePage from "./scenes/homePage/index";
+import LoginPage from "./scenes/loginPage/index";
+import ProfilePage from "./scenes/profilePage/index";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { createTheme } from "@mui/material/styles";
 import { themeSettings } from "./theme";
+import UpdateProfile from "./scenes/navbar/UpdateProfile";
+import UpdatePassword from "./scenes/navbar/UpdatePassword";
+import Chat from './scenes/chatPage/index';
+import ForgotPassword from "./scenes/homePage/";
 
 function App() {
   const mode = useSelector((state) => state.mode);
+  const user = useSelector((state) => state.user);
   const theme = useMemo(() => createTheme(themeSettings(mode)), [mode]);
   const isAuth = Boolean(useSelector((state) => state.token));
+  // console.log(user);
 
   return (
     <div className="app">
@@ -21,18 +26,12 @@ function App() {
           <CssBaseline />
           <Routes>
             <Route path="/" element={<LoginPage />} />
-            <Route
-              path="/home"
-              element={isAuth ? <HomePage /> : <Navigate to="/" />}
-            />
-            <Route
-              path="/profile/:userId"
-              element={isAuth ? <ProfilePage /> : <Navigate to="/" />}
-            />
-            <Route
-              path="/chat"
-              element={isAuth ? <ChatPage /> : <Navigate to="/" />}
-            />
+            <Route path="/home" element={isAuth ? <HomePage user={user} /> : <Navigate to="/" />} />
+            <Route path="/profile/:userID" element={isAuth ? <ProfilePage user={user} id={user._id} /> : <Navigate to="/" />} />
+            <Route path="/update/:id" element={isAuth ? <UpdateProfile user={user} /> : <Navigate to="/" />} />
+            <Route path="/forgot/password" element={<ForgotPassword />} />
+            <Route path="/update/:id/password" element={isAuth ? <UpdatePassword user={user} /> : <Navigate to="/" />} />
+            <Route path="/chat" element={isAuth ? <Chat user={user} /> : <Navigate to="/" />} />
           </Routes>
         </ThemeProvider>
       </BrowserRouter>

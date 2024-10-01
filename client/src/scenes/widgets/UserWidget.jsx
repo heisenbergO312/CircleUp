@@ -4,39 +4,54 @@ import {
   LocationOnOutlined,
   WorkOutlineOutlined,
 } from "@mui/icons-material";
-import { Box, Typography, Divider, useTheme } from "@mui/material";
-import UserImage from "components/UserImage";
-import FlexBetween from "components/FlexBetween";
-import WidgetWrapper from "components/WidgetWrapper";
-import { useSelector } from "react-redux";
-import { useEffect, useState } from "react";
+import {
+  Box,
+  Typography,
+  Divider,
+  useTheme,
+  Button,
+  TextField,
+} from "@mui/material";
+import UserImage from "../../components/UserImage";
+import FlexBetween from "../../components/FlexBetween";
+import WidgetWrapper from "../../components/WidgetWrapper";
 import { useNavigate } from "react-router-dom";
+import LinkedInImg from "../../assets/linkedin.png";
+import TwitterImg from "../../assets/twitter.png";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { setLogin } from "state";
+import DeleteAccountWidget from "../widgets/DeleteAccountWidget";
 
-const UserWidget = ({ userId, picturePath }) => {
-  const [user, setUser] = useState(null);
-  const { palette } = useTheme();
-  const navigate = useNavigate();
+function isValidTwitterUrl(twitterUrl) {
+  const regex = /^https?:\/\/(www\.)?twitter\.com\/[a-zA-Z0-9_]+\/?$/;
+  return regex.test(twitterUrl) || !twitterUrl.length;
+}
+
+function isValidLinkedInUrl(linkedinUrl) {
+  const regex = /^https:\/\/www\.linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/;
+  return regex.test(linkedinUrl) || !linkedinUrl.length;
+}
+
+const UserWidget = (props) => {
+  const [showLinkedin, setShowLinkedin] = useState(false);
+  const [linkedinValue, setLinkedinValue] = useState(props.user?.linkedinUrl || "");
+  const [showTwitter, setShowTwitter] = useState(false);
+  const [twitterValue, setTwitterValue] = useState(props.user?.twitterUrl || "");
+  const [clicked, setClicked] = useState(false);
+  const [update, setUpdate] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
   const token = useSelector((state) => state.token);
-  const dark = palette.neutral.dark;
-  const medium = palette.neutral.medium;
-  const main = palette.neutral.main;
+  const myself = useSelector((state) => state.user);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const theme = useTheme();
+  const dark = theme.palette.neutral.dark;
+  const medium = theme.palette.neutral.medium;
+  const main = theme.palette.neutral.main;
+  useEffect(() => {}, [props.user]);
 
-  const getUser = async () => {
-    const response = await fetch(`https://circleup-67p5.onrender.com/users/${userId}`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await response.json();
-    setUser(data);
-  };
-
-  useEffect(() => {
-    getUser();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!user) {
-    return null;
-  }
+  if (!props.user) return null;
 
   const {
     firstName,
@@ -46,8 +61,45 @@ const UserWidget = ({ userId, picturePath }) => {
     viewedProfile,
     impressions,
     friends,
-    pictureUrl,
-  } = user;
+  } = props.user;
+
+  const addProfiles = async (e) => {
+    e.preventDefault();
+    setClicked(true);
+    setLinkedinValue("");
+    setTwitterValue("");
+
+    const response = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/users/${props.user._id}/update/socialprofile`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          linkedinURL:
+            update === "linkedin" ? linkedinValue : props.user.linkedinUrl,
+          twitterURL:
+            update === "twitter" ? twitterValue : props.user.twitterUrl,
+        }),
+      }
+    );
+
+    const updatedUser = await response.json();
+
+    if (updatedUser.error) {
+      setClicked(false);
+      return;
+    }
+
+    if (updatedUser) {
+      if (update === "linkedin") setShowLinkedin(false);
+      else if (update === "twitter") setShowTwitter(false);
+      setClicked(false);
+      dispatch(setLogin({ user: updatedUser, token: token }));
+    }
+  };
 
   return (
     <WidgetWrapper>
@@ -55,10 +107,10 @@ const UserWidget = ({ userId, picturePath }) => {
       <FlexBetween
         gap="0.5rem"
         pb="1.1rem"
-        onClick={() => navigate(`/profile/${userId}`)}
+        onClick={() => navigate(`/profile/${props.user._id}`)}
       >
         <FlexBetween gap="1rem">
-          <UserImage image={pictureUrl} />
+          <UserImage image={props.user.profilePhoto} />
           <Box>
             <Typography
               variant="h4"
@@ -66,14 +118,14 @@ const UserWidget = ({ userId, picturePath }) => {
               fontWeight="500"
               sx={{
                 "&:hover": {
-                  color: palette.primary.light,
+                  color: theme.palette.primary.light,
                   cursor: "pointer",
                 },
               }}
             >
               {firstName} {lastName}
             </Typography>
-            <Typography color={medium}>{friends.length} friends</Typography>
+            <Typography color={medium}>{friends?.length} friends</Typography>
           </Box>
         </FlexBetween>
         <ManageAccountsOutlined />
@@ -120,30 +172,242 @@ const UserWidget = ({ userId, picturePath }) => {
         </Typography>
 
         <FlexBetween gap="1rem" mb="0.5rem">
-          <FlexBetween gap="1rem">
-            <img src="../assets/twitter.png" alt="twitter" />
-            <Box>
-              <Typography color={main} fontWeight="500">
-                Twitter
-              </Typography>
-              <Typography color={medium}>Social Network</Typography>
-            </Box>
-          </FlexBetween>
-          <EditOutlined sx={{ color: main }} />
+          {!showTwitter && (
+            <>
+              <FlexBetween gap="1rem">
+                <img src={TwitterImg} alt="twitter" />
+                <Box>
+                  <Typography fontWeight="500" color={main}>
+                    {!props.user.twitterUrl ? (
+                      "Twitter"
+                    ) : (
+                      <a
+                        href={`//:${props.user.twitterUrl}`}
+                        target="_blank"
+                        style={{ textDecoration: "none", color: "#00D5FA" }}
+                        rel="noreferrer"
+                      >
+                        Twitter
+                      </a>
+                    )}
+                  </Typography>
+                  <Typography color={medium}>Social Network</Typography>
+                </Box>
+              </FlexBetween>
+              {(props.userId === myself._id || props.home) && (
+                <EditOutlined
+                  sx={{ color: main }}
+                  onClick={() => setShowTwitter(true)}
+                />
+              )}
+            </>
+          )}
+          {showTwitter && (
+            <FlexBetween gap="1rem">
+              <img src={TwitterImg} alt="twitter" />
+              <form onSubmit={addProfiles}>
+                <TextField
+                  label="Enter your Twitter url"
+                  onChange={(e) => setTwitterValue(e.target.value.trimStart())}
+                  value={twitterValue}
+                  name="twitter"
+                  error={!isValidTwitterUrl(twitterValue)}
+                  helperText={
+                    !isValidTwitterUrl(twitterValue)
+                      ? "Enter valid twitter url"
+                      : !twitterValue.length && props.user.twitterUrl
+                      ? "Wanna remove your twitter handle? Add empty field"
+                      : ""
+                  }
+                  sx={{ gridColumn: "span 2", width: "67%" }}
+                  size="small"
+                />
+                <Button
+                  type="submit"
+                  sx={{
+                    mt: "0.15rem",
+                    ml: "0.5rem",
+                    p: "0.4rem 0",
+                    backgroundColor: !clicked
+                      ? theme.palette.primary.main
+                      : "#808080",
+                    color: !clicked ? theme.palette.background.alt : "#101010",
+                    "&:hover": {
+                      color: !clicked ? theme.palette.primary.main : null,
+                      backgroundColor: !clicked ? null : "#808080",
+                    },
+                    "&:disabled": {
+                      color: !clicked
+                        ? theme.palette.background.alt
+                        : "#101010",
+                    },
+                  }}
+                  disabled={clicked || !isValidTwitterUrl(twitterValue)}
+                  onClick={() => setUpdate("twitter")}
+                >
+                  ADD
+                </Button>
+              </form>
+            </FlexBetween>
+          )}
         </FlexBetween>
 
-        <FlexBetween gap="1rem">
-          <FlexBetween gap="1rem">
-            <img src="../assets/linkedin.png" alt="linkedin" />
-            <Box>
-              <Typography color={main} fontWeight="500">
-                Linkedin
-              </Typography>
-              <Typography color={medium}>Network Platform</Typography>
-            </Box>
-          </FlexBetween>
-          <EditOutlined sx={{ color: main }} />
+        <FlexBetween gap="1rem" mb="1rem">
+          {!showLinkedin && (
+            <>
+              <FlexBetween gap="1rem">
+                <img src={LinkedInImg} alt="linkedin" />
+                <Box>
+                  <Typography color={main} fontWeight="500">
+                    {!props.user.linkedinUrl ? (
+                      "Linkedin"
+                    ) : (
+                      <a
+                        href={`//:${props.user.linkedinUrl}`}
+                        target="_blank"
+                        style={{ textDecoration: "none", color: "#00D5FA" }}
+                        rel="noreferrer"
+                      >
+                        Linkedin
+                      </a>
+                    )}
+                  </Typography>
+                  <Typography color={medium}>Network Platform</Typography>
+                </Box>
+              </FlexBetween>
+              {(props.userId === myself._id || props.home) && (
+                <EditOutlined
+                  sx={{ color: main }}
+                  onClick={() => setShowLinkedin(true)}
+                />
+              )}
+            </>
+          )}
+          {showLinkedin && (
+            <FlexBetween gap="1rem">
+              <img src={LinkedInImg} alt="linkedin" />
+              <form onSubmit={addProfiles}>
+                <TextField
+                  label="Enter your Linkedin url"
+                  onChange={(e) => setLinkedinValue(e.target.value.trimStart())}
+                  value={linkedinValue}
+                  name="linkedin"
+                  error={
+                    !isValidLinkedInUrl(linkedinValue) && linkedinValue.length
+                  }
+                  helperText={
+                    !isValidLinkedInUrl(linkedinValue)
+                      ? "Enter valid linkedin url"
+                      : !linkedinValue.length && props.user.linkedinUrl
+                      ? "Wanna remove your linkedin handle? Add empty field"
+                      : ""
+                  }
+                  sx={{ gridColumn: "span 2", width: "67%" }}
+                  size="small"
+                />
+                <Button
+                  type="submit"
+                  sx={{
+                    mt: "0.15rem",
+                    ml: "0.5rem",
+                    p: "0.4rem 0",
+                    backgroundColor: !clicked
+                      ? theme.palette.primary.main
+                      : "#808080",
+                    color: !clicked ? theme.palette.background.alt : "#101010",
+                    "&:hover": {
+                      color: !clicked ? theme.palette.primary.main : null,
+                      backgroundColor: !clicked ? null : "#808080",
+                    },
+                    "&:disabled": {
+                      color: !clicked
+                        ? theme.palette.background.alt
+                        : "#101010",
+                    },
+                  }}
+                  disabled={clicked || !isValidLinkedInUrl(linkedinValue)}
+                  onClick={() => setUpdate("linkedin")}
+                >
+                  ADD
+                </Button>
+              </form>
+            </FlexBetween>
+          )}
         </FlexBetween>
+
+        {(props.userId === myself._id || props.home) && (
+          <div>
+            <Divider />
+            <Button
+              fullWidth
+              type="button"
+              sx={{
+                m: "1rem 0",
+                p: "0.3rem",
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.background.alt,
+                "&:hover": {
+                  color: theme.palette.primary.main,
+                },
+              }}
+              onClick={() => navigate(`/update/${props.user._id}`)}
+            >
+              UPDATE PROFILE
+            </Button>
+            <Typography
+              color={main}
+              fontWeight="500"
+              textAlign="center"
+              margin="-0.6rem 0"
+            >
+              OR
+            </Typography>
+            <Button
+              fullWidth
+              type="button"
+              sx={{
+                m: "1rem 0",
+                p: "0.3rem",
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.background.alt,
+                "&:hover": {
+                  color: theme.palette.primary.main,
+                },
+              }}
+              onClick={() => navigate(`/update/${props.user._id}/password`)}
+            >
+              UPDATE PASSWORD
+            </Button>
+            <Typography
+              color={main}
+              fontWeight="500"
+              textAlign="center"
+              margin="-0.6rem 0"
+            >
+              OR
+            </Typography>
+            <Button
+              fullWidth
+              type="button"
+              sx={{
+                m: "1rem 0",
+                p: "0.3rem",
+                backgroundColor: "#f43636",
+                color: theme.palette.background.alt,
+                "&:hover": {
+                  color: "#f43636",
+                  backgroundColor: "rgba(213, 0, 0, 0.08)",
+                },
+              }}
+              onClick={() => setOpenModal((prev) => !prev)}
+            >
+              DELETE ACCOUNT
+            </Button>
+          </div>
+        )}
+        {openModal && (
+          <DeleteAccountWidget setOpenModal={setOpenModal} user={myself} />
+        )}
       </Box>
     </WidgetWrapper>
   );

@@ -20,44 +20,34 @@ import {
   Menu,
   Close,
 } from "@mui/icons-material";
-import { useDispatch, useSelector } from "react-redux";
-import { setMode, setLogout } from "state";
+import { useDispatch } from "react-redux";
+import { setMode, setLogout } from "../../state/index";
 import { useNavigate } from "react-router-dom";
-import FlexBetween from "components/FlexBetween";
-import io from 'socket.io-client';
+import FlexBetween from "../../components/FlexBetween";
 
-const Navbar = () => {
+const NavBar = (props) => {
   const [isMobileMenuToggled, setIsMobileMenuToggled] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const user = useSelector((state) => state.user);
-  const token = useSelector((state) => state.token);
   const isNonMobileScreens = useMediaQuery("(min-width: 1000px)");
+
   const theme = useTheme();
   const neutralLight = theme.palette.neutral.light;
   const dark = theme.palette.neutral.dark;
   const background = theme.palette.background.default;
   const primaryLight = theme.palette.primary.light;
   const alt = theme.palette.background.alt;
-  const fullName = `${user.firstName} ${user.lastName}`;
 
-  const handleChatClick = () => {
-    const socket = io('http://localhost:3000/start-websocket', {
-      query: { token },
-    });
-
-    socket.on('connect', () => {
-      console.log('WebSocket connection established');
-      navigate('/chat', { state: { socket } });  
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('Connection failed', err);
-    });
-  };
-
+  const fullName = `${props.user?.firstName} ${props.user?.lastName}`;
   return (
-    <FlexBetween padding="1rem 6%" backgroundColor={alt}>
+    <FlexBetween
+      padding="1rem 6%"
+      backgroundColor={alt}
+      position="sticky"
+      top="0"
+      left="0"
+      zIndex="99"
+    >
       <FlexBetween gap="1.75rem">
         <Typography
           fontWeight="bold"
@@ -98,9 +88,10 @@ const Navbar = () => {
               <LightMode sx={{ color: dark, fontSize: "25px" }} />
             )}
           </IconButton>
-          {/* <IconButton onClick={handleChatClick}>
-            <Message sx={{ fontSize: "25px" }} />
-          </IconButton> */}
+          <Message
+            sx={{ fontSize: "25px", cursor: "pointer" }}
+            onClick={() => navigate("/chat")}
+          />
           <Notifications sx={{ fontSize: "25px" }} />
           <Help sx={{ fontSize: "25px" }} />
           <FormControl variant="standard" value={fullName}>
@@ -121,12 +112,25 @@ const Navbar = () => {
               }}
               input={<InputBase />}
             >
-              <MenuItem value={fullName}>
-                <Typography>{fullName}</Typography>
+              <MenuItem
+                value={fullName}
+                onClick={() => navigate(`/profile/${props.user._id}`)}
+              >
+                <Typography>
+                  {fullName.length <= 13
+                    ? fullName
+                    : `${fullName.slice(0, 13)}...`}
+                </Typography>
               </MenuItem>
-              <MenuItem onClick={() => dispatch(setLogout())}>
-                Log Out
+              <MenuItem onClick={() => navigate(`/update/${props.user._id}`)}>
+                Update Profile
               </MenuItem>
+              <MenuItem
+                onClick={() => navigate(`/update/${props.user._id}/password`)}
+              >
+                Update Password
+              </MenuItem>
+              <MenuItem onClick={() => dispatch(setLogout())}>Log Out</MenuItem>
             </Select>
           </FormControl>
         </FlexBetween>
@@ -177,9 +181,10 @@ const Navbar = () => {
                 <LightMode sx={{ color: dark, fontSize: "25px" }} />
               )}
             </IconButton>
-            {/* <IconButton onClick={handleChatClick}>
-              <Message sx={{ fontSize: "25px" }} />
-            </IconButton> */}
+            <Message
+              sx={{ fontSize: "25px", cursor: "pointer" }}
+              onClick={() => navigate("/chat")}
+            />
             <Notifications sx={{ fontSize: "25px" }} />
             <Help sx={{ fontSize: "25px" }} />
             <FormControl variant="standard" value={fullName}>
@@ -200,8 +205,23 @@ const Navbar = () => {
                 }}
                 input={<InputBase />}
               >
-                <MenuItem value={fullName}>
-                  <Typography>{fullName}</Typography>
+                <MenuItem
+                  value={fullName}
+                  onClick={() => navigate(`/profile/${props.user._id}`)}
+                >
+                  <Typography>
+                    {fullName.length <= 13
+                      ? fullName
+                      : `${fullName.slice(0, 13)}...`}
+                  </Typography>
+                </MenuItem>
+                <MenuItem onClick={() => navigate(`/update/${props.user._id}`)}>
+                  Update Profile
+                </MenuItem>
+                <MenuItem
+                  onClick={() => navigate(`/update/${props.user._id}/password`)}
+                >
+                  Update Password
                 </MenuItem>
                 <MenuItem onClick={() => dispatch(setLogout())}>
                   Log Out
@@ -215,4 +235,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;
+export default NavBar;

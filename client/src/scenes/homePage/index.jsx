@@ -1,19 +1,44 @@
 import { Box, useMediaQuery } from "@mui/material";
-import { useSelector } from "react-redux";
-import Navbar from "scenes/navbar";
-import UserWidget from "scenes/widgets/UserWidget";
-import MyPostWidget from "scenes/widgets/MyPostWidget";
-import PostsWidget from "scenes/widgets/PostsWidget";
-import AdvertWidget from "scenes/widgets/AdvertWidget";
-import FriendListWidget from "scenes/widgets/FriendListWidget";
+import Navbar from "../navbar/index";
+import UserWidget from "../widgets/UserWidget";
+import MyPostWidget from "../widgets/MyPostWidget";
+import PostsWidget from "../widgets/PostsWidget";
+import AdvertWidget from "../widgets/AdvertWidget";
+import SuggestedWidget from "../widgets/SuggestedWidget";
+import { useState } from "react";
 
-const HomePage = () => {
+const HomePage = (props) => {
+  const [reRender, setReRender] = useState(false);
   const isNonMobileScreens = useMediaQuery("(min-width:1000px)");
-  const { _id, picturePath } = useSelector((state) => state.user);
+  const [state, setState] = useState(false);
+
+  function isPageBottom() {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const documentHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.offsetHeight,
+      document.body.clientHeight,
+      document.documentElement.clientHeight
+    );
+
+    return scrollTop + windowHeight >= documentHeight - 30;
+  }
+
+  window.addEventListener("scroll", function () {
+    if (isPageBottom()) {
+      // Reached the bottom of the page
+      setState((prev) => !prev);
+      console.log("Reached the bottom of the page");
+    }
+  });
 
   return (
     <Box>
-      <Navbar />
+      <Navbar user={props.user} />
       <Box
         width="100%"
         padding="2rem 6%"
@@ -22,20 +47,41 @@ const HomePage = () => {
         justifyContent="space-between"
       >
         <Box flexBasis={isNonMobileScreens ? "26%" : undefined}>
-          <UserWidget userId={_id} picturePath={picturePath} />
+          <UserWidget user={props.user} home={true} />
         </Box>
+        {!isNonMobileScreens && (
+          <Box flexBasis="26%">
+            {/* <Box m="2rem 0" /> */}
+            <SuggestedWidget
+              userId={props.user._id}
+              reRender={reRender}
+              setReRender={setReRender}
+            />
+          </Box>
+        )}
         <Box
           flexBasis={isNonMobileScreens ? "42%" : undefined}
           mt={isNonMobileScreens ? undefined : "2rem"}
         >
-          <MyPostWidget picturePath={picturePath} />
-          <PostsWidget userId={_id} />
+          <MyPostWidget profilePhoto={props.user.profilePhoto} />
+          <PostsWidget
+            userId={props.user._id}
+            user={props.user}
+            reRender={reRender}
+            setReRender={setReRender}
+            home={true}
+            state={state}
+          />
         </Box>
         {isNonMobileScreens && (
           <Box flexBasis="26%">
             <AdvertWidget />
             <Box m="2rem 0" />
-            <FriendListWidget userId={_id} />
+            <SuggestedWidget
+              userId={props.user._id}
+              reRender={reRender}
+              setReRender={setReRender}
+            />
           </Box>
         )}
       </Box>

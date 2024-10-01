@@ -1,89 +1,122 @@
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setPosts } from "state";
+import { setPosts } from "../../state/index";
 import PostWidget from "./PostWidget";
 
-const PostsWidget = ({ userId, isProfile = false }) => {
+const PostsWidget = ({
+  userId,
+  user,
+  isProfile = false,
+  name,
+  reRender,
+  setReRender,
+  home,
+  state,
+  setFlags,
+}) => {
   const dispatch = useDispatch();
   const posts = useSelector((state) => state.posts);
+  const [postsData, setPostsData] = useState([]);
+  const [flag, setFlag] = useState(false);
   const token = useSelector((state) => state.token);
 
-  const getPosts = async () => {
-    try {
-      const response = await fetch("https://circleup-67p5.onrender.com/posts", {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      dispatch(setPosts({ posts: data }));
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-    }
-  };
-  
-
-  const getUserPosts = async () => {
-    try {
-      const response = await fetch(
-        `https://circleup-67p5.onrender.com/posts/${userId}/posts`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await response.json();
-      
- 
-      dispatch(setPosts({ posts: data }));
-    } catch (error) {
-      console.error("Error fetching user posts:", error);
-    }
-  };
+  useEffect(() => {
+    const getMorePosts = async () => {
+      let arr = [...postsData];
+      for (
+        let i = postsData.length;
+        i < postsData.length + 1 && i < posts.length;
+        i++
+      ) {
+        arr.push(posts[i]);
+      }
+      setPostsData(arr);
+    };
+    getMorePosts(); // eslint-disable-next-line
+  }, [state, reRender, flag]);
 
   useEffect(() => {
     if (isProfile) {
+      const getUserPosts = async () => {
+        const response = await fetch(
+          `${process.env.REACT_APP_BACKEND_URL}/posts/${userId}/posts`,
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const data = await response.json();
+        dispatch(setPosts({ posts: data }));
+      };
       getUserPosts();
     } else {
+      const getPosts = async () => {
+        const response = await fetch(
+          `${process.env.REACT_APP_BACKEND_URL}/posts/${userId}`,
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const data = await response.json();
+        dispatch(setPosts({ posts: data }));
+        setPostsData([]);
+        setFlag((prev) => !prev);
+      };
       getPosts();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    } // eslint-disable-next-line
+  }, [dispatch, token, userId, isProfile, reRender]);
 
+  let allPosts = postsData;
+  if (isProfile) allPosts = posts;
 
   return (
-    <>
-      {Array.isArray(posts) && posts.length > 0 ? (
-        posts.map(
-          ({
-            _id,
-            userId,
-            firstName,
-            lastName,
-            description,
-            location,
-            pictureUrl,
-            pictureUser,
-            likes,
-            comments,
-          }) => (
-            <PostWidget
-              key={_id}
-              postId={_id}
-              postUserId={userId}
-              name={`${firstName} ${lastName}`}
-              description={description}
-              location={location}
-              picturePath={pictureUrl}
-              userPicturePath={pictureUser}
-              likes={likes}
-              comments={comments}
-            />
-          )
-        )
-      ) : (
-        <p>No posts available</p>
+    <div className="main-container">
+      {home && posts.length === 0 && (
+        <h1 style={{ textAlign: "center" }}>
+          Follow other user's to see their posts!!
+        </h1>
       )}
-    </>
+      {posts.length
+        ? postsData &&
+          allPosts.map(
+            ({
+              _id,
+              userId,
+              firstName,
+              lastName,
+              description,
+              location,
+              postImage,
+              userProfilePhoto,
+              likes,
+              comments,
+              showLikes,
+              showComments,
+            }) => (
+              <PostWidget
+                key={_id}
+                postId={_id}
+                postUserId={userId}
+                user={user}
+                name={`${firstName} ${lastName}`}
+                description={description}
+                location={location}
+                postImage={postImage}
+                userProfilePhoto={userProfilePhoto}
+                likes={likes}
+                comments={comments}
+                showLikes={showLikes}
+                showComments={showComments}
+                reRender={reRender}
+                setReRender={setReRender}
+                setFlags={setFlags}
+              />
+            )
+          )
+        : !home && <h1>{name} hasn't posted anything yet!</h1>}
+    </div>
   );
 };
 
-export default PostsWidget;
+export default React.memo(PostsWidget);

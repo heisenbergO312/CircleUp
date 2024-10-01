@@ -1,6 +1,7 @@
 import { Typography, useTheme } from "@mui/material";
-import FlexBetween from "components/FlexBetween";
-import WidgetWrapper from "components/WidgetWrapper";
+import FlexBetween from "../../components/FlexBetween";
+import WidgetWrapper from "../../components/WidgetWrapper";
+import advertImg from "../../assets/info4.jpeg";
 
 const AdvertWidget = () => {
   const { palette } = useTheme();
@@ -20,7 +21,7 @@ const AdvertWidget = () => {
         width="100%"
         height="auto"
         alt="advert"
-        src="https://circleup-67p5.onrender.com/assets/info4.jpeg"
+        src={advertImg}
         style={{ borderRadius: "0.75rem", margin: "0.75rem 0" }}
       />
       <FlexBetween>

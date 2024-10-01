@@ -1,19 +1,27 @@
 import { Box, Typography, useTheme } from "@mui/material";
-import Friend from "components/Friend";
-import WidgetWrapper from "components/WidgetWrapper";
-import { useEffect,useCallback } from "react";
+import Friend from "../../components/Friend";
+import WidgetWrapper from "../../components/WidgetWrapper";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setFriends } from "state";
+import { setFriends } from "../../state/index";
 
-const FriendListWidget = ({ userId }) => {
+const FriendListWidget = ({
+  userId,
+  reRender,
+  setReRender,
+  profile,
+  followClick,
+  flags,
+}) => {
   const dispatch = useDispatch();
   const { palette } = useTheme();
   const token = useSelector((state) => state.token);
   const friends = useSelector((state) => state.user.friends);
 
-  const getFriends = useCallback(async () => {
+  const getFriends = async () => {
+    dispatch(setFriends({ friends: [] }));
     const response = await fetch(
-      `https://circleup-67p5.onrender.com/users/${userId}/friends`,
+      `${process.env.REACT_APP_BACKEND_URL}/users/${userId}/friends`,
       {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
@@ -21,16 +29,14 @@ const FriendListWidget = ({ userId }) => {
     );
     const data = await response.json();
     dispatch(setFriends({ friends: data }));
-  }, [dispatch, token, userId]);
+  };
 
   useEffect(() => {
-    if (userId && token) {
-      getFriends();
-    }
-  }, [getFriends, userId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+    getFriends(); // eslint-disable-next-line
+  }, [followClick, flags]);
 
   return (
-    <WidgetWrapper>
+    <WidgetWrapper maxHeight="14rem" friend="true">
       <Typography
         color={palette.neutral.dark}
         variant="h5"
@@ -40,16 +46,19 @@ const FriendListWidget = ({ userId }) => {
         Friend List
       </Typography>
       <Box display="flex" flexDirection="column" gap="1.5rem">
-        {friends.map((friend) => (
-          console.log("Friend data,",friend),
-          <Friend
-            key={friend._id}
-            friendId={friend._id}
-            name={`${friend.firstName} ${friend.lastName}`}
-            subtitle={friend.occupation}
-            userPicturePath={friend.pictureUser}
-          />
-        ))}
+      {(friends && Array.isArray(friends) ? friends : []).map((friend, index) => (
+         <Friend
+           key={index}
+           friendId={friend._id}
+           name={`${friend.firstName} ${friend.lastName}`}
+           subtitle={friend.occupation}
+           userProfilePhoto={friend.profilePhoto}
+           reRender={reRender}
+           setReRender={setReRender}
+           profile={profile}
+         />
+       ))}
+
       </Box>
     </WidgetWrapper>
   );

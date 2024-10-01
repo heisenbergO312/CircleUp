@@ -1,43 +1,18 @@
 import jwt from "jsonwebtoken";
+import { StatusCodes } from "http-status-codes";
 
-export const verifyToken = async (req, res, next) => {
-  try {
-    let token = req.header("Authorization");
+export const authenticationMiddleware = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(StatusCodes.FORBIDDEN).json({ msg: "Access Denied" });
+        }
 
-    if (!token) {
-      return res.status(403).send("Access Denied");
-    }
-
-    if (token.startsWith("Bearer ")) {
-      token = token.slice(7, token.length).trimLeft();
-    }
-
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified;
-    next();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-export const verifyWebSocketToken = (ws, req, next) => {
-  try {
-    const token = req.url.split('token=')[1];
-
-    if (!token) {
-      ws.close();
-      return;
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-      if (err) {
-        ws.close();
-      } else {
-        ws.user = decoded;
+        const token = authHeader.split(' ')[1]; // object : {Bearer, token}
+        const verified = jwt.verify(token, process.env.JWT_SECRET); // decodes my token like jwt debugger
+        req.user = verified;
         next();
-      }
-    });
-  } catch (err) {
-    ws.close();
-  }
-};
+    } catch (error) {
+        return res.status(StatusCodes.UNAUTHORIZED).json({ msg: "Not authorized to access this route" });
+    }
+}
