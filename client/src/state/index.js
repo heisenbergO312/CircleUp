@@ -15,7 +15,6 @@ const initialState = {
     user: null,
     token: null,
     posts: [],
-    friends:[],
 };
 
 const authSlice = createSlice({

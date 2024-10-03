@@ -95,21 +95,29 @@ const MyPostWidget = ({ profilePhoto }) => {
     }
   };
 
+  // useEffect to handle post submission after the image is uploaded and URL is available
   useEffect(() => {
-    uploadImage(); // eslint-disable-next-line
-  }, [image]);
+    if (imageUrl || (!image && post)) {
+      handlePost(); // Trigger the post only if imageUrl is set or no image is being uploaded
+    }
+  }, [imageUrl]); // Depend on imageUrl to ensure it triggers after upload
 
   const handlePost = async () => {
-    while (image === null) {}
-    let formData = {};
-    formData.userId = _id;
-    formData.description = post;
-    if (image) {
-      formData.postImage = imageUrl;
+    let formData = {
+      userId: _id,
+      description: post,
+    };
+  
+    if (imageUrl) {
+      formData.postImage = imageUrl;  // Only add image URL if it's available
     }
 
+    // Reset fields after preparing the form data
     setImage(null);
     setPost("");
+    setImageUrl(null); // Clear image URL for the next post
+  
+    // Send the post data to the backend
     const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/posts`, {
       method: "POST",
       headers: {
@@ -118,9 +126,21 @@ const MyPostWidget = ({ profilePhoto }) => {
       },
       body: JSON.stringify(formData),
     });
+  
     const posts = await response.json();
+    
+    // Update the posts in Redux state and trigger a re-render
     dispatch(setPosts({ posts }));
     navigate("/home");
+  };
+
+  // Handle the post button click
+  const handlePostButtonClick = () => {
+    if (image) {
+      uploadImage(); // Trigger the image upload
+    } else {
+      setImageUrl(null); // If no image, directly trigger handlePost
+    }
   };
 
   return (
@@ -245,8 +265,8 @@ const MyPostWidget = ({ profilePhoto }) => {
         )}
 
         <Button
-          disabled={!post || !image}
-          onClick={handlePost}
+          disabled={!post || (isImage && !image)}
+          onClick={handlePostButtonClick} // Call when post is clicked
           sx={{
             color: palette.background.alt,
             backgroundColor: palette.primary.main,
